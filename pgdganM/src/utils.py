@@ -6,6 +6,8 @@ import pickle
 import shutil
 import tensorflow as tf
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from skimage.measure import compare_ssim as ssim
 from matplotlib.backends.backend_pdf import PdfPages
@@ -183,8 +185,8 @@ def image_matrix(images, est_images, view_image, hparams, alg_labels=True):
             view_image(image, hparams)
 
     if hparams.image_matrix >= 2:
-        save_path = get_matrix_save_path(hparams)
-        plt.savefig(save_path)
+       # save_path = get_matrix_save_path(hparams)
+        plt.savefig('figure2.png')
 
     if hparams.image_matrix in [1, 3]:
         plt.show()
@@ -244,10 +246,9 @@ def get_save_paths(hparams, image_num):
 
 
 def get_matrix_save_path(hparams):
-    save_path = './estimated/{0}/{1}/{2}/{3}/{4}/matrix_{5}.png'.format(
+    save_path = './estimated/{0}/{1}/{2}/matrix_{3}.png'.format(
         hparams.input_type,
         hparams.measurement_type,
-        hparams.num_measurements,
         '_'.join(hparams.model_types)
     )
     return save_path

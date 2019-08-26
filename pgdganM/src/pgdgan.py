@@ -50,14 +50,14 @@ def main(hparams):
         x_batch = np.concatenate(x_coll) # Generates entire X
         A_outer = utils_celab.get_outer_A(hparams) # Created the random matric A
 
-        y_batch_outer = q(np.matmul(x_batch, A_outer)) # Multiplication of A and X followed by quantization on 4 levels
+        y_batch_outer = np.matmul(x_batch, A_outer) # Multiplication of A and X followed by quantization on 4 levels
 
         x_main_batch = 0.0 * x_batch
         z_opt_batch = np.random.randn(hparams.batch_size, 100) #Input to the generator of the GAN
 
         for k in range(maxiter):
 
-            x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - q(np.matmul(x_main_batch, A_outer))), A_outer.T))
+            x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - np.matmul(x_main_batch, A_outer)), A_outer.T))
             # Gradient decent in x is done
             estimator = estimators['dcgan']
             x_hat_batch, z_opt_batch = estimator(x_est_batch, z_opt_batch, hparams) # Projectin on the GAN
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     # Input
     PARSER.add_argument('--input-type', type=str, default='full-input', help='Where to take input from')
     PARSER.add_argument('--input-path-pattern', type=str, default='./data/celebAtest/*.jpg', help='Pattern to match to get images')
-    PARSER.add_argument('--num-input-images', type=int, default=5, help='number of input images')
+    PARSER.add_argument('--num-input-images', type=int, default=2, help='number of input images')
     PARSER.add_argument('--batch-size', type=int, default=1, help='How many examples are processed together')
 
     # Problem definition
@@ -144,8 +144,8 @@ if __name__ == '__main__':
     PARSER.add_argument('--optimizer-type', type=str, default='adam', help='Optimizer type')
     PARSER.add_argument('--learning-rate', type=float, default=0.1, help='learning rate')
     PARSER.add_argument('--momentum', type=float, default=0.9, help='momentum value')
-    PARSER.add_argument('--max-update-iter', type=int, default=1, help='maximum updates to z')
-    PARSER.add_argument('--num-random-restarts', type=int, default=1, help='number of random restarts')
+    PARSER.add_argument('--max-update-iter', type=int, default=50, help='maximum updates to z')
+    PARSER.add_argument('--num-random-restarts', type=int, default=2, help='number of random restarts')
     PARSER.add_argument('--decay-lr', action='store_true', help='whether to decay learning rate')
     PARSER.add_argument('--outer-learning-rate', type=float, default=0.5, help='learning rate of outer loop GD')
     PARSER.add_argument('--max-outer-iter', type=int, default=10, help='maximum no. of iterations for outer loop GD')
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     PARSER.add_argument('--save-stats', action='store_true', help='whether to save estimated images')
     PARSER.add_argument('--print-stats', action='store_true', help='whether to print statistics')
     PARSER.add_argument('--checkpoint-iter', type=int, default=50, help='checkpoint every x batches')
-    PARSER.add_argument('--image-matrix', type=int, default=1,
+    PARSER.add_argument('--image-matrix', type=int, default=2,
                         help='''
                                 0 = 00 =      no       image matrix,
                                 1 = 01 =          show image matrix

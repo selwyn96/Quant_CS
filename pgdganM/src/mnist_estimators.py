@@ -55,7 +55,7 @@ def vae_estimator(hparams):
 
     # measure the estimate
 
-    y_hat_batch = tf.zeros_like(x_hat_batch,name='y2_batch')
+    y_hat_batch = tf.identity(x_hat_batch,name='y2_batch')
 
     # define all losses
     m_loss1_batch = tf.reduce_mean(tf.abs(y_batch - y_hat_batch), 1)

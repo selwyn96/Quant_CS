@@ -3,6 +3,9 @@ import os
 from argparse import ArgumentParser
 import numpy as np
 import utils
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 
 import numpy as np
@@ -14,18 +17,24 @@ def q(v): # 4 bits ? Hmm
     for i, _ in enumerate(v):
         for t, _ in enumerate(v[i]):
 
-            if(v[i][t] < -1):
-                print(0)
-                n[i] = 0
-            elif (v[i][t] < 0):
+            if(v[i][t] > 0 and v[i][t] <= 1):
+                print(-1)
+                n[i][t] = 2
+            elif (v[i][t] > 1):
                 print(1)
-                n[i] = 1
-            elif (v[i][t] < 1):
-                print(2)
-                n[i] = 2
-            elif(v[i][t] > 1):
-                print(3)
-                n[i] = 3
+                n[i][t] = 4
+            elif (v[i][t] == 0 ):
+                print(0)
+                n[i][t] = 0
+            elif (v[i][t] < 0 and v[i][t] >=  -1 ):
+                print(0)
+                n[i][t] = -2
+
+            elif (v[i][t] <-1):
+                print(1)
+                n[i][t] = -4
+            
+    
     return n
 
 
@@ -41,7 +50,6 @@ def main(hparams):
 
     x_hats_dict = {'vae': {}}
     x_batch_dict = {}
-
     for key, x in xs_dict.iteritems():
 
         x_batch_dict[key] = x #placing images in dictionary
@@ -51,7 +59,13 @@ def main(hparams):
         x_batch = np.concatenate(x_coll) # Generates entire X
         A_outer = utils.get_outer_A(hparams) # Created the random matric A
 
-        y_batch_outer = q(np.matmul(x_batch, A_outer)) # Multiplication of A and X followed by quantization on 4 levels
+        y_batch_outer =q(np.matmul(x_batch, A_outer)) # Multiplication of A and X followed by quantization on 4 levels
+        print y_batch_outer
+        print y_batch_outer.shape
+        #y_batch_outer = np.matmul(x_batch, A_outer)
+        
+
+        
 
         x_main_batch = 0.0 * x_batch
         z_opt_batch = np.random.randn(hparams.batch_size, 20) #Input to the generator of the GAN
@@ -59,6 +73,7 @@ def main(hparams):
         for k in range(maxiter):
 
             x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - q(np.matmul(x_main_batch, A_outer))), A_outer.T))
+            #x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - np.matmul(x_main_batch, A_outer)), A_outer.T))
             # Gradient decent in x is done
             estimator = estimators['vae']
             x_hat_batch, z_opt_batch = estimator(x_est_batch, z_opt_batch, hparams) # Projectin on the GAN
@@ -107,6 +122,9 @@ def main(hparams):
     if len(x_batch_dict) > 0:
         print '\nDid NOT process last {} images because they did not fill up the last batch.'.format(len(x_batch_dict))
         print 'Consider rerunning lazily with a smaller batch size.'
+    
+    
+
 
 
 
@@ -124,15 +142,15 @@ if __name__ == '__main__':
     PARSER.add_argument('--dataset', type=str, default='mnist', help='Dataset to use')
     PARSER.add_argument('--input-type', type=str, default='full-input', help='Where to take input from')
     PARSER.add_argument('--input-path-pattern', type=str, default='./data/mnist', help='Pattern to match to get images')
-    PARSER.add_argument('--num-input-images', type=int, default=5, help='number of input images')
-    PARSER.add_argument('--batch-size', type=int, default=1, help='How many examples are processed together')
+    PARSER.add_argument('--num-input-images', type=int, default=8, help='number of input images')
+    PARSER.add_argument('--batch-size', type=int, default=8, help='How many examples are processed together')
 
     # Problem definition
     PARSER.add_argument('--measurement-type', type=str, default='gaussian', help='measurement type: as of now supports only gaussian')
 
     # Measurement type specific hparams
 
-    PARSER.add_argument('--num-outer-measurements', type=int, default=1000, help='number of gaussian measurements(outer)')
+    PARSER.add_argument('--num-outer-measurements', type=int, default=100, help='number of gaussian measurements(outer)')
 
     # Model
     PARSER.add_argument('--model-types', type=str, nargs='+', default=['vae'], help='model(s) used for estimation')
@@ -147,7 +165,7 @@ if __name__ == '__main__':
     PARSER.add_argument('--learning-rate', type=float, default=0.1, help='learning rate')
     PARSER.add_argument('--momentum', type=float, default=0.9, help='momentum value')
     PARSER.add_argument('--max-update-iter', type=int, default=100, help='maximum updates to z')
-    PARSER.add_argument('--num-random-restarts', type=int, default=1, help='number of random restarts')
+    PARSER.add_argument('--num-random-restarts', type=int, default=2, help='number of random restarts')
     PARSER.add_argument('--decay-lr', action='store_true', help='whether to decay learning rate')
     PARSER.add_argument('--outer-learning-rate', type=float, default=0.5, help='learning rate of outer loop GD')
     PARSER.add_argument('--max-outer-iter', type=int, default=10, help='maximum no. of iterations for outer loop GD')
@@ -158,7 +176,7 @@ if __name__ == '__main__':
     PARSER.add_argument('--save-stats', action='store_true', help='whether to save estimated images')
     PARSER.add_argument('--print-stats', action='store_true', help='whether to print statistics')
     PARSER.add_argument('--checkpoint-iter', type=int, default=50, help='checkpoint every x batches')
-    PARSER.add_argument('--image-matrix', type=int, default=1,
+    PARSER.add_argument('--image-matrix', type=int, default=2,
                         help='''
                                 0 = 00 =      no       image matrix,
                                 1 = 01 =          show image matrix
