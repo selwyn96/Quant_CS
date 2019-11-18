@@ -65,3 +65,19 @@ def model_input(hparams):
         raise NotImplementedError
 
     return images
+
+def data_input(hparams):
+    """Create input tensors"""
+
+    mnist = input_data.read_data_sets('./data/mnist', one_hot=True)
+
+    if hparams.input_type == 'full-input':
+        images = {i: image for (i, image) in enumerate(mnist.test.images[:400])}
+    elif hparams.input_type == 'random-test':
+        images = get_random_test_subset(mnist, hparams.num_input_images)
+    elif hparams.input_type == 'gen-span':
+        images = sample_generator_images(hparams)
+    else:
+        raise NotImplementedError
+
+    return images

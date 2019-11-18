@@ -16,7 +16,7 @@ def display_transform(image):
 def view_image(image, hparams, mask=None):
     """Process and show the image"""
     image = display_transform(image)
-    if len(image) == hparams.n_input:
+    if len(image) ==  hparams.n_input:
         image = image.reshape(hparams.image_shape)
         if mask is not None:
             mask = mask.reshape(hparams.image_shape)

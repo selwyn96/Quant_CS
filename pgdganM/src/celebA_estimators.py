@@ -8,6 +8,8 @@ import numpy as np
 import utils_celab
 import scipy.fftpack as fftpack
 import pywt
+import sys
+#np.set_printoptions(threshold=sys.maxint)
 
 import celebA_model_def
 import mnist_estimators
@@ -36,22 +38,32 @@ def devec(vector):
 
 
 def lasso_dct_estimator(hparams):  # pylint: disable = W0613
-    """LASSO with DCT"""
-    def estimator(A_val, y_batch_val, hparams):
-        # One can prove that taking 2D DCT of each row of A,
-        # then solving usual LASSO, and finally taking 2D ICT gives the correct answer.
-        A_new = copy.deepcopy(A_val)
-        for i in range(A_val.shape[1]):
-            A_new[:, i] = vec([dct2(channel) for channel in devec(A_new[:, i])])
-
-        x_hat_batch = []
-        for j in range(hparams.batch_size):
-            y_val = y_batch_val[j]
-            z_hat = utils_celab.solve_lasso(A_new, y_val, hparams)
-            x_hat = vec([idct2(channel) for channel in devec(z_hat)]).T
-            x_hat = np.maximum(np.minimum(x_hat, 1), -1)
-            x_hat_batch.append(x_hat)
-        return x_hat_batch
+    def estimator(x_batch,y_batch_val, A, hparams,maxiter):
+        x_main_batch = 0.0 * x_batch
+        A_outer = copy.deepcopy(A)
+        print x_batch
+        x_batch= fftpack.dct(x_batch, norm='ortho')
+        print x_batch
+       # for i in range(A.shape[1]):
+       #     A_outer[:, i] = vec([dct2(channel) for channel in devec(A_outer[:, i])])
+        y_batch_outer = np.sign(np.matmul(x_batch, A))
+        for k in range(maxiter):
+            x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - (np.sign(np.matmul(x_main_batch, A)))), A.T))
+            for i in range(hparams.batch_size):
+                colls = x_est_batch[i]
+                temp=colls.argsort()[-2000:]
+                for j in range(len(colls)): 
+                    if( j not in temp):
+                        x_est_batch[i][j]=0
+            
+            x_main_batch = x_est_batch
+      
+        print x_main_batch
+        x_main_batch = fftpack.idct(x_main_batch, norm='ortho')
+        x_main_batch = np.maximum(np.minimum(x_main_batch, 1), -1)
+      #  x_main_batch=np.reshape(x_main_batch,[1,12288])
+        print x_main_batch
+        return x_main_batch
     return estimator
 
 
@@ -64,7 +76,6 @@ def dcgan_estimator(hparams):
     # Set up palceholders
     #A = tf.placeholder(tf.float32, shape=(hparams.n_input, hparams.num_measurements), name='A')
     y_batch = tf.placeholder(tf.float32, shape=(hparams.batch_size, hparams.n_input), name='y_batch')
-
     # Create the generator
     z_batch = tf.Variable(tf.random_normal([hparams.batch_size, 100]), name='z_batch')
     x_hat_batch, restore_dict_gen, restore_path_gen = celebA_model_def.dcgan_gen(z_batch, hparams)
@@ -75,8 +86,7 @@ def dcgan_estimator(hparams):
     # measure the estimate
 
     y_hat_batch = tf.identity(x_hat_batch, name='y2_batch')
-
-
+    
     # define all losses
     m_loss1_batch =  tf.reduce_mean(tf.abs(y_batch - y_hat_batch), 1)
     m_loss2_batch =  tf.reduce_mean((y_batch - y_hat_batch)**2, 1)
@@ -122,7 +132,8 @@ def dcgan_estimator(hparams):
         assign_z_opt_op = z_batch.assign(z_batch_val)
 
         feed_dict = {y_batch: y_batch_val}
-
+        global y_global
+        y_global=y_batch_val
 
         for i in range(hparams.num_random_restarts):
             sess.run(opt_reinit_op)
@@ -153,3 +164,6 @@ def dcgan_estimator(hparams):
         return best_keeper.get_best()
 
     return estimator
+
+
+

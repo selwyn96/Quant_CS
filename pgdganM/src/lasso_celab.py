@@ -6,8 +6,30 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import utils_celab
+import scipy.fftpack as fftpack
+
 import numpy as np
 
+
+def dct2(image_channel):
+    return fftpack.dct(fftpack.dct(image_channel.T, norm='ortho').T, norm='ortho')
+
+
+def idct2(image_channel):
+    return fftpack.idct(fftpack.idct(image_channel.T, norm='ortho').T, norm='ortho')
+
+
+def vec(channels):
+    image = np.zeros((64, 64, 3))
+    for i, channel in enumerate(channels):
+        image[:, :, i] = channel
+    return image.reshape([-1])
+
+
+def devec(vector):
+    image = np.reshape(vector, [64, 64, 3])
+    channels = [image[:, :, i] for i in range(3)]
+    return channels
 
 def q(v): # 4 bits ? Hmm
     t = np.shape(v)
@@ -37,19 +59,17 @@ def q(v): # 4 bits ? Hmm
 
 
 def main(hparams):
-  #  hparams.n_input = np.prod(hparams.image_shape)
-    hparams.n_input=12288
+    hparams.n_input = np.prod(hparams.image_shape)
     maxiter = hparams.max_outer_iter
+    hparams.model_type='lasso-dct'
     utils_celab.print_hparams(hparams)
     xs_dict = model_input(hparams) # returns the images
     estimators = utils_celab.get_estimators(hparams)
     utils_celab.setup_checkpointing(hparams)
     measurement_losses, l2_losses = utils_celab.load_checkpoints(hparams)
 
-    x_hats_dict = {'dcgan': {}}
+    x_hats_dict = {'lasso-dct': {}}
     x_batch_dict = {}
-
-  
 
     for key, x in xs_dict.iteritems():
 
@@ -59,44 +79,37 @@ def main(hparams):
         x_coll = [x.reshape(1, hparams.n_input) for _, x in x_batch_dict.iteritems()] #Generates the columns of input x
         x_batch = np.concatenate(x_coll) # Generates entire X
         A_outer = utils_celab.get_outer_A(hparams) # Created the random matric A
+        
 
-        y_batch_outer = np.round(np.matmul(x_batch, A_outer)) # Multiplication of A and X followed by quantization on 4 levels
+        y_batch_outer = np.sign(np.matmul(x_batch, A_outer)) # Multiplication of A and X followed by quantization on 4 levels
     
-        ''' 
+        '''
         histo=y_batch_outer.flatten()
         plt.hist(histo)
         plt.savefig('histogram.png')'''
 
 
         x_main_batch = 0.0 * x_batch
-        z_opt_batch = np.random.randn(hparams.batch_size, 100) #Input to the generator of the GAN
-
-        for k in range(maxiter):
-
-            x_est_batch = x_main_batch + hparams.outer_learning_rate * np.matmul((y_batch_outer - np.round(np.matmul(x_main_batch, A_outer))), A_outer.T)
-            # Gradient decent in x is done
-            estimator = estimators['dcgan']
-            x_hat_batch, z_opt_batch = estimator(x_est_batch, z_opt_batch, hparams) # Projectin on the GAN
-            x_main_batch = x_hat_batch
-            y_batch= (np.matmul(x_main_batch, A_outer))
-            mean=np.mean(np.abs(y_batch_outer-y_batch),1)
-            final=np.mean(mean)
-            print "The real loss"
-            print final
+      #  z_opt_batch = np.random.randn(hparams.batch_size, 100) #Input to the generator of the GAN
 
 
+        estimator = estimators['lasso-dct']
+        x_hat_batch = estimator(x_batch,y_batch_outer, A_outer, hparams,maxiter) # Projectin on the GAN
+        
+            
 
         for i, key in enumerate(x_batch_dict.keys()):
             x = xs_dict[key]
             y = y_batch_outer[i]
             x_hat = x_hat_batch[i]
-
+            
+        
             # Save the estimate
-            x_hats_dict['dcgan'][key] = x_hat
+            x_hats_dict['lasso-dct'][key] = x_hat
 
             # Compute and store measurement and l2 loss
-            measurement_losses['dcgan'][key] = utils_celab.get_measurement_loss(x_hat, A_outer, y)
-            l2_losses['dcgan'][key] = utils_celab.get_l2_loss(x_hat, x)
+            measurement_losses['lasso-dct'][key] = utils_celab.get_measurement_loss(x_hat, A_outer, y)
+            l2_losses['lasso-dct'][key] = utils_celab.get_l2_loss(x_hat, x)
         print 'Processed upto image {0} / {1}'.format(key + 1, len(xs_dict))
 
         # Checkpointing
@@ -133,7 +146,7 @@ def main(hparams):
 
 
 
- 
+
 if __name__ == '__main__':
 
     PARSER = ArgumentParser()
@@ -144,7 +157,7 @@ if __name__ == '__main__':
     # Input
     PARSER.add_argument('--input-type', type=str, default='full-input', help='Where to take input from')
     PARSER.add_argument('--input-path-pattern', type=str, default='./data/celebAtest/*.jpg', help='Pattern to match to get images')
-    PARSER.add_argument('--num-input-images', type=int, default=3, help='number of input images')
+    PARSER.add_argument('--num-input-images', type=int, default=5, help='number of input images')
     PARSER.add_argument('--batch-size', type=int, default=1, help='How many examples are processed together')
 
     # Problem definition
@@ -152,10 +165,10 @@ if __name__ == '__main__':
 
     # Measurement type specific hparams
 
-    PARSER.add_argument('--num-outer-measurements', type=int, default=2000, help='number of gaussian measurements(outer)')
+    PARSER.add_argument('--num-outer-measurements', type=int, default=3000, help='number of gaussian measurements(outer)')
 
     # Model
-    PARSER.add_argument('--model-types', type=str, nargs='+', default=['dcgan'], help='model(s) used for estimation')
+    PARSER.add_argument('--model-types', type=str, nargs='+', default=['lasso-dct'], help='model(s) used for estimation')
     PARSER.add_argument('--mloss1_weight', type=float, default=0.0, help='L1 measurement loss weight')
     PARSER.add_argument('--mloss2_weight', type=float, default=1.0, help='L2 measurement loss weight')
     PARSER.add_argument('--zprior_weight', type=float, default=0.001, help='weight on z prior')
@@ -166,11 +179,14 @@ if __name__ == '__main__':
     PARSER.add_argument('--optimizer-type', type=str, default='adam', help='Optimizer type')
     PARSER.add_argument('--learning-rate', type=float, default=0.1, help='learning rate')
     PARSER.add_argument('--momentum', type=float, default=0.9, help='momentum value')
-    PARSER.add_argument('--max-update-iter', type=int, default=100, help='maximum updates to z')
+    PARSER.add_argument('--max-update-iter', type=int, default=500, help='maximum updates to z')
     PARSER.add_argument('--num-random-restarts', type=int, default=2, help='number of random restarts')
     PARSER.add_argument('--decay-lr', action='store_true', help='whether to decay learning rate')
-    PARSER.add_argument('--outer-learning-rate', type=float, default=1, help='learning rate of outer loop GD')
+    PARSER.add_argument('--outer-learning-rate', type=float, default=0.5, help='learning rate of outer loop GD')
     PARSER.add_argument('--max-outer-iter', type=int, default=10, help='maximum no. of iterations for outer loop GD')
+    # LASSO specific hparams
+    PARSER.add_argument('--lmbd', type=float, default=0.1, help='lambda : regularization parameter for LASSO')
+    PARSER.add_argument('--lasso-solver', type=str, default='sklearn', help='Solver for LASSO')
 
     # Output
     PARSER.add_argument('--lazy', action='store_true', help='whether the evaluation is lazy')

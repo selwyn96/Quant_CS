@@ -11,14 +11,13 @@ import utils
 
 def lasso_estimator(hparams):  # pylint: disable = W0613
     """LASSO estimator"""
-    def estimator(A_val, y_batch_val, hparams):
-        x_hat_batch = []
+    def estimator(x_hat_batch,y_batch_val, A, hparams):
         for i in range(hparams.batch_size):
-            y_val = y_batch_val[i]
-            x_hat = utils.solve_lasso(A_val, y_val, hparams)
-            x_hat = np.maximum(np.minimum(x_hat, 1), 0)
-            x_hat_batch.append(x_hat)
-        x_hat_batch = np.asarray(x_hat_batch)
+            colls = x_hat_batch[i]
+            temp=colls.argsort()[-100:]
+            for j in range(len(colls)):
+                if( j not in temp):
+                    x_hat_batch[i][j]=0
         return x_hat_batch
     return estimator
 

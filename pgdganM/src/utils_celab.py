@@ -11,6 +11,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from skimage.measure import compare_ssim as ssim
 from matplotlib.backends.backend_pdf import PdfPages
+from scipy.fftpack import dct
+import cv2
 
 import celebA_estimators
 
@@ -77,7 +79,10 @@ def load_if_pickled(pkl_filepath):
 
 def get_estimator(hparams, model_type):
 
-    if model_type == 'dcgan':
+
+    if model_type == 'lasso-dct':
+        estimator = celebA_estimators.lasso_dct_estimator(hparams)
+    elif model_type == 'dcgan':
         estimator = celebA_estimators.dcgan_estimator(hparams)
     else:
         raise NotImplementedError
@@ -207,6 +212,10 @@ def get_checkpoint_dir(hparams, model_type):
             hparams.max_update_iter,
             hparams.num_random_restarts,
         )
+    elif model_type in ['lasso-dct']:
+        dir_name = '{}'.format(
+            hparams.lmbd,
+        )
     else:
         raise NotImplementedError
 
@@ -285,13 +294,24 @@ def get_optimizer(learning_rate, hparams):
         raise Exception('Optimizer ' + hparams.optimizer_type + ' not supported')
 
 
-
 def get_outer_A(hparams):
     A_outer = (1.0 / np.sqrt(hparams.num_outer_measurements)) * np.random.randn(hparams.n_input,
                                                                                 hparams.num_outer_measurements)
-    return A_outer
+    return A_outer 
+'''
+def get_outer_A(hparams):
+  #  A = dct(np.eye(hparams.n_input), axis=0)
+ #   lists=np.random.randint(low=0, high=hparams.n_input-1, size=hparams.num_measurements)
+    A_outer=np.random.binomial(1,0.5,(hparams.num_outer_measurements,hparams.n_input))
+    np.place(A_outer, A_outer==0, [-1])
+    print A_outer
+  #  A_outer=A[lists]
+    A_outer=A_outer.T
+   # print A_outer.shape
+    A_outer =  (1.0 / (np.sqrt(hparams.num_outer_measurements))) * A_outer
+   # A= np.random.randn(hparams.n_input,hparams.num_outer_measurements) 
 
-
+    return A_outer '''
 def get_checkpoint_path(ckpt_dir):
     ckpt_dir = os.path.abspath(ckpt_dir)
     ckpt = tf.train.get_checkpoint_state(ckpt_dir)
@@ -309,6 +329,27 @@ def save_plot(is_save, save_path):
         pdf = PdfPages(save_path)
         pdf.savefig(bbox_inches='tight')
         pdf.close()
+
+def set_num_measurements(hparams):
+    if hparams.measurement_type == 'project':
+        hparams.num_measurements = hparams.n_input
+    else:
+        hparams.num_measurements = get_A(hparams).shape[1]
+
+def get_A(hparams):
+    if hparams.measurement_type == 'gaussian':
+        A = np.random.randn(hparams.n_input, hparams.num_measurements)
+    elif hparams.measurement_type == 'superres':
+        A = get_A_superres(hparams)
+    elif hparams.measurement_type in ['fixed', 'learned']:
+        A = restore_A(hparams)
+    elif hparams.measurement_type == 'inpaint':
+        A = get_A_inpaint(hparams)
+    elif hparams.measurement_type == 'project':
+        A = None
+    else:
+        raise NotImplementedError
+    return A
 
 
 def solve_lasso(A_val, y_val, hparams):
