@@ -36,7 +36,7 @@ The paper provide sample complexity bounds for approximate recovery under i.i.d.
 ```shell
     $ ./setup/download_data.sh 
 ```
-4. To run the code for the VAE:
+4. To run the code:
 ```shell
     $ python ./src/mnist_main.py
 ```
@@ -46,6 +46,8 @@ The paper provide sample complexity bounds for approximate recovery under i.i.d.
 
 ![MNIST](Results/results.png)
 
+Reconstructed images with 50 measurements (left) and reconstruction with 200 measurements (right) on the MNIST
+dataset.
 
 ## References
 
