@@ -10,7 +10,7 @@ The paper provide sample complexity bounds for approximate recovery under i.i.d.
 
 * Python 2.7
 
-* Tensorflow 1.0.1 (preferably with GPU support)
+* Tensorflow 1.0.1 
 
 * Scipy
 
