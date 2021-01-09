@@ -34,7 +34,7 @@ The paper provide sample complexity bounds for approximate recovery under i.i.d.
 
 3. Download/extract pretrained models (courtesy [Bora et al.](https://github.com/AshishBora/csgm)). To train the model from scratch, please visit [Bora et al.](https://github.com/AshishBora/csgm)
 ```shell
-    $ ./setup/download_data.sh 
+    $ ./setup/download_models.sh 
 ```
 4. To run the code:
 ```shell
