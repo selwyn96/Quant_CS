@@ -18,7 +18,6 @@ import itertools
 from itertools import combinations
 from scipy.linalg import hadamard
 
-import celebA_estimators
 import mnist_estimators
 
 from sklearn.linear_model import Lasso
@@ -306,36 +305,10 @@ def get_optimizer(learning_rate, hparams):
     else:
         raise Exception('Optimizer ' + hparams.optimizer_type + ' not supported')
 
-
-
-def get_outer_A(hparams,X):
-    A=dft(hparams.n_input)
-    #  A= np.random.randn(hparams.n_input,hparams.n_input)
-    
-    # output = sum([list(map(list, combinations(inputs,hparams.num_outer_measurements)))] , [])
-    maximum=0
-    X=X.T
-    for i in range (0,10000):
-         # need to make a training set from the data (784,samples), actually check this 
-        lists=np.random.randint(low=0, high=hparams.n_input-1, size=200)
-        A_out=A[lists]
-       # A_out=A_out.T
-        V= np.matmul(A_out,X)
-        temp=np.matmul((V.T),V)
-        diag=np.diagonal(temp)
-        Y=np.amax(np.subtract(np.ones(len(diag)),diag))
-        print Y
-        if i==0:
-            maximum=Y
-            index=lists
-        elif Y>maximum:
-            maximum=Y
-            index=lists
-        print maximum
-    A_outer=A[index]
-    A_outer=A_outer.T
-        
-        
+def get_outer_A(hparams):
+    A_outer = (1.0 / np.sqrt(hparams.num_outer_measurements)) * np.random.randn(hparams.n_input,
+                                                                                hparams.num_outer_measurements)
+    return A_outer
         
    # lists=np.random.randint(low=0, high=hparams.n_input-1, size=100)
   #  lists=lists.sort()

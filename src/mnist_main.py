@@ -11,16 +11,12 @@ from numpy import linalg as LA
 
 import numpy as np
 
-
-
-
 def main(hparams):
     hparams.n_input = np.prod(hparams.image_shape)
     hparams.model_type='vae'
     maxiter = hparams.max_outer_iter
     utils.print_hparams(hparams)
     xs_dict = model_input(hparams) # returns the images
-    test_data= data_input(hparams) # test data for generating A
     estimators = utils.get_estimators(hparams)
     utils.setup_checkpointing(hparams)
     measurement_losses, l2_losses = utils.load_checkpoints(hparams)
@@ -28,27 +24,20 @@ def main(hparams):
     x_hats_dict = {'vae': {}}
     x_batch_dict = {}
 
-    x_test_temp = [x.reshape(1, hparams.n_input) for _, x in test_data.iteritems()] #Generates the columns of input x
-    x_test = np.concatenate(x_test_temp)
-    
-   
-
-
     for key, x in xs_dict.iteritems():
-
+        print key
         x_batch_dict[key] = x #placing images in dictionary
         if len(x_batch_dict) < hparams.batch_size:
             continue
         x_coll = [x.reshape(1, hparams.n_input) for _, x in x_batch_dict.iteritems()] #Generates the columns of input x
         x_batch = np.concatenate(x_coll) # Generates entire X
 
-        A_outer = utils.get_outer_A(hparams,x_test) # Created the random matric A
+        A_outer = utils.get_outer_A(hparams) # Created the random matric A
     
         noise_batch = hparams.noise_std * np.random.randn(hparams.batch_size, 100)
 
-        y_batch_outer =np.sign(np.matmul(x_batch, A_outer)) # Multiplication of A and X followed by quantization 
-        print y_batch_outer
-        print y_batch_outer.shape
+        y_batch_outer =np.sign(np.matmul(x_batch, A_outer)) # Multiplication of A and X followed by quantization on 4 levels
+        
         #y_batch_outer = np.matmul(x_batch, A_outer)
         
 
@@ -59,14 +48,20 @@ def main(hparams):
 
         for k in range(maxiter):
 
-            x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - np.sign((np.matmul(x_main_batch, A_outer)))), A_outer.T))
+            x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - np.sign(np.matmul(x_main_batch, A_outer))), A_outer.T))
             #x_est_batch = x_main_batch + hparams.outer_learning_rate * (np.matmul((y_batch_outer - np.matmul(x_main_batch, A_outer)), A_outer.T))
             # Gradient decent in x is done
             estimator = estimators['vae']
-            x_hat_batch, z_opt_batch = estimator(x_est_batch, z_opt_batch, hparams) # Projectin on the VAE
+            x_hat_batch, z_opt_batch = estimator(x_est_batch, z_opt_batch, hparams) # Projectin on the GAN
             x_main_batch = x_hat_batch
+            
 
+        
+        dist = np.linalg.norm(x_batch-x_main_batch)/784
+        print 'cool'
+        print dist
 
+ 
         for i, key in enumerate(x_batch_dict.keys()):
             x = xs_dict[key]
             y = y_batch_outer[i]
@@ -129,8 +124,8 @@ if __name__ == '__main__':
     PARSER.add_argument('--dataset', type=str, default='mnist', help='Dataset to use')
     PARSER.add_argument('--input-type', type=str, default='full-input', help='Where to take input from')
     PARSER.add_argument('--input-path-pattern', type=str, default='./data/mnist', help='Pattern to match to get images')
-    PARSER.add_argument('--num-input-images', type=int, default=8, help='number of input images')
-    PARSER.add_argument('--batch-size', type=int, default=8, help='How many examples are processed together')
+    PARSER.add_argument('--num-input-images', type=int, default=10, help='number of input images')
+    PARSER.add_argument('--batch-size', type=int, default=10, help='How many examples are processed together')
 
     # Problem definition
     PARSER.add_argument('--measurement-type', type=str, default='gaussian', help='measurement type: as of now supports only gaussian')
@@ -139,7 +134,7 @@ if __name__ == '__main__':
 
     # Measurement type specific hparams
 
-    PARSER.add_argument('--num-outer-measurements', type=int, default=200, help='number of gaussian measurements(outer)')
+    PARSER.add_argument('--num-outer-measurements', type=int, default=300, help='number of gaussian measurements(outer)')
 
     # Model
     PARSER.add_argument('--model-types', type=str, nargs='+', default=['vae'], help='model(s) used for estimation')
@@ -153,11 +148,11 @@ if __name__ == '__main__':
     PARSER.add_argument('--optimizer-type', type=str, default='adam', help='Optimizer type')
     PARSER.add_argument('--learning-rate', type=float, default=0.1, help='learning rate')
     PARSER.add_argument('--momentum', type=float, default=0.9, help='momentum value')
-    PARSER.add_argument('--max-update-iter', type=int, default=100, help='maximum updates to z')
+    PARSER.add_argument('--max-update-iter', type=int, default=200, help='maximum updates to z')
     PARSER.add_argument('--num-random-restarts', type=int, default=2, help='number of random restarts')
     PARSER.add_argument('--decay-lr', action='store_true', help='whether to decay learning rate')
-    PARSER.add_argument('--outer-learning-rate', type=float, default=0.5, help='learning rate of outer loop GD')
-    PARSER.add_argument('--max-outer-iter', type=int, default=10, help='maximum no. of iterations for outer loop GD')
+    PARSER.add_argument('--outer-learning-rate', type=float, default=1.25, help='learning rate of outer loop GD')
+    PARSER.add_argument('--max-outer-iter', type=int, default=15, help='maximum no. of iterations for outer loop GD')
 
     # Output
     PARSER.add_argument('--lazy', action='store_true', help='whether the evaluation is lazy')
